@@ -1,13 +1,11 @@
-import numpy as np
 import cv2
+
 
 def main():
     print("test")
 
-
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
     patternSize = (9, 6)
-
 
     imgLeft = cv2.imread("TI119_L.jpg")
     imgRight = cv2.imread("TI119_R.jpg")
@@ -39,11 +37,6 @@ def main():
         print(foundCornersLeft)
         print("Found corners right:")
         print(foundCornersRight)
-
-
-
-
-
 
 
 if __name__ == "__main__":
