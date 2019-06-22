@@ -39,7 +39,6 @@ def main():
         cv2.imwrite("editedLeft.jpg", imgLeft)
         print("written")
 
-        # ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1],None,None)
         # append for right format
         objectPoints.append(objPoints)
         imagePoints.append(leftCorners)
@@ -49,6 +48,31 @@ def main():
         print(cameraMatrix)
         print("\n\nReprojection Error:")
         print(reprojectionError)
+
+
+
+
+
+
+        # Affine reconstruction - factorization alorithm
+        print("\n\n\nAffine Reconstruction")
+
+        # i = 1, ..., m --> Count of camera matrices and therefore images
+        # j = 1, ..., n --> Count of realworld points and therefore imagepoints per image
+
+        # computation of translation:
+        # t^i = <x^i> = 1 / n * sum(x^i(j))
+        centroid = sum(leftCorners) / (patternSize[0]*patternSize[1])
+        print("Centroid:")
+        print(centroid)
+
+        # centre the data:
+        # x^i(j) <-- x^i(j) - t^i
+        centredPoints = leftCorners - centroid
+        print("\n\nCentred Points")
+        print(centredPoints)
+
+        #
 
 
 
