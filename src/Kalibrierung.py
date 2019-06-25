@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+from scipy.sparse.linalg import svds, eigs
 
 
 def main():
@@ -70,9 +71,39 @@ def main():
         # x^i(j) <-- x^i(j) - t^i
         centredPoints = leftCorners - centroid
         print("\n\nCentred Points")
-        print(centredPoints)
+        print(centredPoints[:,0])
 
+        # Construct measurement matrix W
+        #      _                            _
+        #     | x1,1    x1,2    ...     x1,n |
+        #     | x2,1    x2,2    ...     x2,n |
+        # W = | ...     ...     ...     ...  |
+        #     | xm,1    xm,2    ...     xm,n |
+        #     ‾‾                            ‾‾
         #
+        # n = Count of image/world points
+        # m = Count of images / camera matrices
+        # 2D-Points (x) stacked vertically
+        # --> W = 2m*n matrix
+
+        #todo: refactoring
+        # measurement line to form x and y in different columns
+        measurementLine = np.vstack((centredPoints[:,0,0], centredPoints[:,0,1]))
+        measurementMatrix = np.vstack((measurementLine, measurementLine))
+        print("\n\n\nMeasurement Matrix:")
+
+        #compute svd
+        u, dTemp, vT = svds(measurementMatrix, k=3)
+        d = np.diag(dTemp)
+
+        M = np.matmul(u, d)
+        X = vT
+
+        print("\n\nCameraMatrizes:")
+        print(M)
+        print("\n3D-Points:")
+        print(X)
+
 
 
 

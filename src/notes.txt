@@ -3,6 +3,9 @@ https://books.google.de/books?id=YDBwBAAAQBAJ&pg=PA296&lpg=PA296&dq=affine+kamer
 http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.682.2930&rep=rep1&type=pdf
 https://www.peterkovesi.com/studentprojects/mohan/documentation/thesis/handed_cshonours.pdf
 
+measurement matrix:
+http://cvgl.stanford.edu/teaching/cs231a_winter1415/lecture/lecture7_perspective_SFM_notes.pdf
+
 Reprojection Error:
 https://en.wikipedia.org/wiki/Reprojection_error
 
