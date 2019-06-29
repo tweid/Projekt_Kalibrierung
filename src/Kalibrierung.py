@@ -3,9 +3,75 @@ import cv2
 from scipy.sparse.linalg import svds, eigs
 
 
-def main():
-    print("test")
+def affineReconstruction(corners, patternSize):
+    # i = 1, ..., m --> Count of camera matrices and therefore images
+    # j = 1, ..., n --> Count of realworld points and therefore imagepoints per image
 
+    # computation of translation:
+    # t^i = <x^i> = 1 / n * sum(x^i(j))
+    centroid = sum(corners) / (patternSize[0]*patternSize[1])
+    print("Centroid:")
+    print(centroid)
+
+    # centre the data:
+    # x^i(j) <-- x^i(j) - t^i
+    centredPoints = corners - centroid
+    print("\n\nCentred Points")
+    print(centredPoints[:,0])
+
+    # Construct measurement matrix W
+    #      _                            _
+    #     | x1,1    x1,2    ...     x1,n |
+    #     | x2,1    x2,2    ...     x2,n |
+    # W = | ...     ...     ...     ...  |
+    #     | xm,1    xm,2    ...     xm,n |
+    #     ‾‾                            ‾‾
+    #
+    # n = Count of image/world points
+    # m = Count of images / camera matrices
+    # 2D-Points (x) stacked vertically
+    # --> W = 2m*n matrix
+
+    #todo: refactoring
+    # measurement line to form x and y in different columns
+    measurementLine = np.vstack((centredPoints[:,0,0], centredPoints[:,0,1]))
+    measurementMatrix = np.vstack((measurementLine, measurementLine))
+    print("\n\n\nMeasurement Matrix:")
+
+    #compute svd
+    u, dTemp, vT = svds(measurementMatrix, k=3)
+    d = np.diag(dTemp)
+
+    #todo: matrices in seperate arrays
+    M = np.matmul(u, d)
+    #X = np.matrix.getH(vT)
+    X = vT
+    #seems like (y, x, z)
+
+    return M, centroid[0], X
+
+
+
+
+
+
+def calculate3dTo2d(M, t, X):
+    # (x, y) = M * (x, y, z) + t
+    xyTemp = np.matmul(M, X)
+    xy = []
+    for i in range(len(xyTemp[0])):
+        xy.append(xyTemp[:, i] + t)
+
+    return xy
+
+
+
+
+
+
+
+
+def main():
     patternSize = (9, 6)
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
@@ -57,52 +123,18 @@ def main():
 
         # Affine reconstruction - factorization alorithm
         print("\n\n\nAffine Reconstruction")
+        M, t, X = affineReconstruction(leftCorners, patternSize)
 
-        # i = 1, ..., m --> Count of camera matrices and therefore images
-        # j = 1, ..., n --> Count of realworld points and therefore imagepoints per image
-
-        # computation of translation:
-        # t^i = <x^i> = 1 / n * sum(x^i(j))
-        centroid = sum(leftCorners) / (patternSize[0]*patternSize[1])
-        print("Centroid:")
-        print(centroid)
-
-        # centre the data:
-        # x^i(j) <-- x^i(j) - t^i
-        centredPoints = leftCorners - centroid
-        print("\n\nCentred Points")
-        print(centredPoints[:,0])
-
-        # Construct measurement matrix W
-        #      _                            _
-        #     | x1,1    x1,2    ...     x1,n |
-        #     | x2,1    x2,2    ...     x2,n |
-        # W = | ...     ...     ...     ...  |
-        #     | xm,1    xm,2    ...     xm,n |
-        #     ‾‾                            ‾‾
-        #
-        # n = Count of image/world points
-        # m = Count of images / camera matrices
-        # 2D-Points (x) stacked vertically
-        # --> W = 2m*n matrix
-
-        #todo: refactoring
-        # measurement line to form x and y in different columns
-        measurementLine = np.vstack((centredPoints[:,0,0], centredPoints[:,0,1]))
-        measurementMatrix = np.vstack((measurementLine, measurementLine))
-        print("\n\n\nMeasurement Matrix:")
-
-        #compute svd
-        u, dTemp, vT = svds(measurementMatrix, k=3)
-        d = np.diag(dTemp)
-
-        M = np.matmul(u, d)
-        X = vT
 
         print("\n\nCameraMatrizes:")
         print(M)
         print("\n3D-Points:")
         print(X)
+
+        print(calculate3dTo2d(M[:2], t, X))
+
+
+
 
 
 
