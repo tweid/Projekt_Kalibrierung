@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 from scipy.sparse.linalg import svds, eigs
+from scipy.spatial import distance
 
 
 def affineReconstruction(corners, patternSize):
@@ -71,6 +72,37 @@ def calculate3dTo2d(M, t, X):
 
 
 
+
+
+
+def computeMeanReprojectionError(imgPoints, reprojectedPoints):
+    #imgPoints: [[[x0,0 y0,0]] [[x0,1 y0,1]]]]
+    #https://stackoverflow.com/questions/23781089/opencv-calibratecamera-2-reprojection-error-and-custom-computed-one-not-agree
+    total_error=0
+    total_points=0
+    for i in range(len(imgPoints)):
+        err = 0;
+        total_points += len(imgPoints[i])
+        for j in range(len(imgPoints[i])):
+            p = imgPoints[i][j][0]
+            q = reprojectedPoints[j]
+            err += (p[0] - q[0])**2 + (p[1] - q[1])**2
+        total_error += err
+
+    mean_error=np.sqrt(total_error/total_points)
+    return mean_error
+
+
+
+
+
+
+
+
+
+
+
+
 def main():
     patternSize = (9, 6)
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
@@ -117,6 +149,13 @@ def main():
         print(reprojectionError)
 
 
+        reprojectedPoints, _ = cv2.projectPoints(objectPoints[0], rotationVecs[0], translationVecs[0], cameraMatrix, distCoeffs)
+        reprojectedPoints = reprojectedPoints.reshape(-1,2)
+        print("Selfcalculated Reprojection Error:")
+        print(computeMeanReprojectionError(imagePoints, reprojectedPoints))
+
+        print("\n\n\nReprojected Points:\n", reprojectedPoints);
+
 
 
 
@@ -131,8 +170,9 @@ def main():
         print("\n3D-Points:")
         print(X)
 
-        print(calculate3dTo2d(M[:2], t, X))
-
+        affineProjectedPoints = calculate3dTo2d(M[:2], t, X)
+        print("\n\n\nAffine Reprojected Points;\n", affineProjectedPoints)
+        print("\n\nAffine Reprojection Error:\n", computeMeanReprojectionError(imagePoints, affineProjectedPoints))
 
 
 
