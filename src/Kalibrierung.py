@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import cv2
 from scipy.sparse.linalg import svds, eigs
@@ -13,17 +15,17 @@ def affineReconstruction(corners, patternSize):
         # computation of translation:
         # t^i = <x^i> = 1 / n * sum(x^i(j))
         centroid.append(sum(corners[i]) / (patternSize[0]*patternSize[1]))
-    print("Centroid:")
+    #print("Centroid:")
     centroid = np.reshape(centroid, (len(corners), 2))
-    print(centroid)
+    #print(centroid)
 
     # centre the data:
     # x^i(j) <-- x^i(j) - t^i
     centredPoints = []
     for i in range(len(corners)):
         centredPoints.append(corners[i] - centroid[i])
-    print("\n\nCentred Points")
-    print(centredPoints)
+    #print("\n\nCentred Points")
+    #print(centredPoints)
 
     # Construct measurement matrix W
     #      _                            _
@@ -42,7 +44,7 @@ def affineReconstruction(corners, patternSize):
     for i in range(len(corners)):
         measurementMatrix.append(np.vstack((centredPoints[i][:, 0, 0], centredPoints[i][:, 0, 1])))
     measurementMatrix = np.reshape(measurementMatrix, (len(corners)*2, len(centredPoints[0])))
-    print("\n\n\nMeasurement Matrix:\n", measurementMatrix)
+    #print("\n\n\nMeasurement Matrix:\n", measurementMatrix)
 
     #compute svd
     u, dTemp, vT = svds(measurementMatrix, k=3)
@@ -91,7 +93,7 @@ def affineReprojection(affineCameraMatrizes, imagePoints, t, X):
     affineReprojectionError = []
     for i in range(len(affineCameraMatrizes)):
         affineReprojectedPoints.append(calculate3dTo2d(affineCameraMatrizes[i], t[i], X))
-        affineReprojectionError.append(computeMeanReprojectionError(imagePoints, affineReprojectedPoints[i][:]))
+        affineReprojectionError.append(computeMeanReprojectionError(imagePoints[i], affineReprojectedPoints[i][:]))
     affineReprojectedPoints = np.reshape(affineReprojectedPoints, (len(affineCameraMatrizes), len(imagePoints[0]), 2))
     return affineReprojectedPoints, affineReprojectionError
 
@@ -124,10 +126,9 @@ def computeMeanReprojectionError(imgPoints, reprojectedPoints):
     for i in range(len(imgPoints)):
         err = 0;
         total_points += len(imgPoints[i])
-        for j in range(len(imgPoints[i])):
-            p = imgPoints[i][j][0]
-            q = reprojectedPoints[j]
-            err += (p[0] - q[0])**2 + (p[1] - q[1])**2
+        p = imgPoints[i][0]
+        q = reprojectedPoints[i]
+        err += (p[0] - q[0])**2 + (p[1] - q[1])**2
         total_error += err
 
     mean_error=np.sqrt(total_error/total_points)
@@ -160,22 +161,29 @@ def main():
     images = glob.glob('calc*.jpg')
 
     for fileName in images:
+        print("Processing ", fileName)
         image = cv2.imread(fileName)
         grayImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         foundCorners, corners = cv2.findChessboardCorners(grayImage, patternSize, None)
 
         if foundCorners == True:
+            print("Found Corners!")
             cornersRefined = cv2.cornerSubPix(grayImage, corners, (11, 11), (-1, -1), criteria)
             image = cv2.drawChessboardCorners(image, patternSize, cornersRefined, foundCorners)
             cv2.imwrite("edited_" + fileName, image)
 
             objectPoints.append(objPoints)
             imagePoints.append(cornersRefined)
+            print("Image Points processed with OpenCV\n\n")
+
 
         else:
             print("Didn't found corners in ", fileName)
 
+    startOpenCV = time.time()
     reprojectionError, cameraMatrix, distCoeffs, rotationVecs, translationVecs = cv2.calibrateCamera(objectPoints, imagePoints, grayImage.shape[::-1],None,None)
+    endOpenCV = time.time()
+    timeOpenCV = endOpenCV - startOpenCV
 
     print("\n\n\nCamera Matrix:")
     print(cameraMatrix)
@@ -189,7 +197,7 @@ def main():
         reprojectedPoints, _ = cv2.projectPoints(objectPoints[i], rotationVecs[i], translationVecs[i], cameraMatrix, distCoeffs)
         reprojectedPoints = reprojectedPoints.reshape(-1,2)
         allReprojectedPoints.append(reprojectedPoints)
-        meanReprojectionErrors.append(computeMeanReprojectionError(imagePoints, reprojectedPoints))
+        meanReprojectionErrors.append(computeMeanReprojectionError(imagePoints[i], reprojectedPoints))
     print("\n\n\nReprojected Points:\n", allReprojectedPoints);
     print("\nSelfcalculated Reprojection Errors:\n", meanReprojectionErrors)
 
@@ -200,7 +208,10 @@ def main():
 
     # Affine reconstruction - factorization alorithm
     print("\n\n\nAffine Reconstruction")
+    startAffine = time.time()
     M, t, X = affineReconstruction(imagePoints, patternSize)
+    endAffine = time.time()
+    timeAffine = endAffine - startAffine
     affineCameraMatrizes = np.split(M, len(images))
 
 
@@ -215,6 +226,10 @@ def main():
     affineReprojectedPoints, affineReprojectionError = affineReprojection(affineCameraMatrizes, imagePoints, t, X)
     print("\n\n\nAffine Reprojected Points;\n", affineReprojectedPoints)
     print("\n\nAffine Reprojection Error:\n", affineReprojectionError)
+    print("\n\nTime needed by OpenCV: ", timeOpenCV)
+    print("Time needed by Affine: ", timeAffine)
+
+    #todo: Check with second images
 
 
 
