@@ -6,6 +6,13 @@ from scipy.sparse.linalg import svds, eigs
 from scipy.spatial import distance
 import glob
 
+HORIZONTAL_PATTERN_DISTANCE = -1 #Horizontal distance between Pattern sheets in meter
+VERTICAL_PATTERN_DISTANCE = 0.02 #Vertical distance between Pattern sheets in meter
+
+POINT_DISTANCE = 0.02 #Distance between points in meter
+
+CONTROLLING = True #Is a Controlling-Pattern there
+
 CALC_FILE_BEGINNING = 'calc'
 CONTROL_FILE_BEGINNING = 'control'
 JPG_NAME = CALC_FILE_BEGINNING + '*.jpg'
@@ -166,20 +173,17 @@ def movingHorizontalAffine(X, affineCameraMatrizes, foundCorners, images, patter
     # y-difference = 0.001 und alle 9 0.8
     # x-difference = 0.5
     # z-difference = random
-    cornerDistance = 0.02  # Horizontal distance between points in meter
-    patternDistance = 1  # Horizontal distance between Pattern sheets in meter
-    relativeDistance = patternDistance / cornerDistance  # Ratio between Distance of Patterns and Distance of Points
+    relativeDistance = [VERTICAL_PATTERN_DISTANCE / POINT_DISTANCE, HORIZONTAL_PATTERN_DISTANCE / POINT_DISTANCE]  # Ratio between Distance of Patterns and Distance of Points
     newX = X.copy()
     relative3dDistance = [0, 0, 0]
-    # for d in range(len(relative3dDistance)): #For every dimension
-    for d in range(1, 2):  # For horizontal dimension
-        for i in range(patternSize[1]):  # For each row
-            for j in range(patternSize[0] - 1):  # For each Distance between two Columns
-                relative3dDistance[d] += X[d][i * patternSize[0] + j + 1] - X[1][
-                    i * patternSize[0] + j]  # Sum up Distance between Points
-        relative3dDistance[d] = relative3dDistance[d] / (
-                patternSize[1] * (patternSize[0] - 1))  # Get mean Distance by dividing by number of added Distances
-        relative3dDistance[d] = relative3dDistance[d] * relativeDistance * -1  # Multiplying with relative Distance
+
+    #Horizontal Distance
+    for i in range(patternSize[1]):  # For each row
+        for j in range(patternSize[0] - 1):  # For each Distance between two Columns
+            relative3dDistance[1] += X[1][i * patternSize[0] + j + 1] - X[1][
+                i * patternSize[0] + j]  # Sum up Distance between Points
+    relative3dDistance[1] = relative3dDistance[1] / (patternSize[1] * (patternSize[0] - 1))  # Get mean Distance by dividing by number of added Distances
+    relative3dDistance[1] = relative3dDistance[1] * relativeDistance[1]  # Multiplying with relative Distance
     newX = np.add(newX, np.reshape(relative3dDistance, (3, 1)))
 
     for imageNumber in range(len(images)):
@@ -298,7 +302,8 @@ def main():
     print("\n\nTime needed by OpenCV: ", timeOpenCV)
     print("Time needed by Affine: ", timeAffine)
 
-    movingHorizontalAffine(X, affineCameraMatrizes, foundCorners, images, patternSize, t)
+    if CONTROLLING:
+        movingHorizontalAffine(X, affineCameraMatrizes, foundCorners, images, patternSize, t)
 
 if __name__ == "__main__":
     main()
