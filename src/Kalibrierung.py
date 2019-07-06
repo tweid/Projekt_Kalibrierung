@@ -10,7 +10,7 @@ PATTERN_SIZE = (9, 6)
 
 CONTROLLING = True #Is a Controlling-Pattern there
 HORIZONTAL_PATTERN_DISTANCE = 1 #Horizontal distance between Pattern sheets in meter (<0: control pattern left, >0: right)
-VERTICAL_PATTERN_DISTANCE = 0.05 #Vertical distance between Pattern sheets in meter (<0: control pattern up, >0: down)
+VERTICAL_PATTERN_DISTANCE = 0.04 #Vertical distance between Pattern sheets in meter (<0: control pattern up, >0: down)
 
 POINT_DISTANCE = 0.02 #Distance between points in meter
 
@@ -171,11 +171,8 @@ def computeMeanReprojectionError(imgPoints, reprojectedPoints):
 
 
 
-def movingAffine(X, affineCameraMatrizes, foundCorners, images, t):
+def movingAffine(X, affineCameraMatrizes, images, t):
     # 3d-Points like y, x, z.
-    # y-difference = 0.001 und alle 9 0.8
-    # x-difference = 0.5
-    # z-difference = random
     relativeDistance = [VERTICAL_PATTERN_DISTANCE / POINT_DISTANCE, HORIZONTAL_PATTERN_DISTANCE / POINT_DISTANCE]  # Ratio between Distance of Patterns and Distance of Points
     newX = X.copy()
     relative3dDistance = [0, 0, 0]
@@ -216,7 +213,75 @@ def movingAffine(X, affineCameraMatrizes, foundCorners, images, t):
         image = cv2.drawChessboardCorners(image, PATTERN_SIZE, newImagePoints.astype(np.float32), foundCorners)
         cv2.imwrite("edited_" + fileName, image)
 
-    print("\n\nControl image reprojection error:\n", reprojectionError)
+    print("\n\nControl image affine reprojection error:\n", reprojectionError)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def movingCV(objectPoints, images, t, rotationVecs, translationVecs, cameraMatrix, distCoeffs):
+    # 3d-Points like x, y, z.
+    relativeDistance = [HORIZONTAL_PATTERN_DISTANCE / POINT_DISTANCE, VERTICAL_PATTERN_DISTANCE / POINT_DISTANCE]  # Ratio between Distance of Patterns and Distance of Points
+    newObjectPoints = objectPoints.copy()
+    relative3dDistance = [0, 0, 0]
+
+    #Horizontal Distance
+    for i in range(PATTERN_SIZE[1]):  # For each row
+        # Sum up Distance between Points
+        relative3dDistance[0] += objectPoints[i * PATTERN_SIZE[0]][0] - objectPoints[(i + 1) * PATTERN_SIZE[0] - 1][0]
+    # Get mean Distance by dividing by number of added Distances
+    relative3dDistance[0] = relative3dDistance[0] / (PATTERN_SIZE[1] * (PATTERN_SIZE[0] - 1))
+    # Multiplying with relative Distance
+    relative3dDistance[0] = relative3dDistance[0] * relativeDistance[0]
+
+    #Vertical Distance
+    for i in range(PATTERN_SIZE[0]): #For each column
+        #Sum of vertical distances
+        relative3dDistance[1] += objectPoints[i][1] - objectPoints[i + PATTERN_SIZE[0] * (PATTERN_SIZE[1] - 1)][1]
+    # Get mean Distance by dividing by number of added Distances
+    relative3dDistance[1] = relative3dDistance[1] / ((PATTERN_SIZE[0] - 1) * PATTERN_SIZE[1])
+    # Multiplying with relative Distance
+    relative3dDistance[1] = relative3dDistance[1] * relativeDistance[1]
+
+    newObjectPoints = np.add(newObjectPoints, np.reshape(relative3dDistance, (1, 3)))
+
+
+    reprojectionError = []
+    for imageNumber in range(len(images)):
+        fileName = images[imageNumber].replace(CALC_FILE_BEGINNING, CONTROL_FILE_BEGINNING)
+        image = cv2.imread(fileName)
+
+        grayImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        foundCorners, corners = cv2.findChessboardCorners(grayImage, PATTERN_SIZE, None)
+        cornersRefined = cv2.cornerSubPix(grayImage, corners, (11, 11), (-1, -1), CRITERIA)
+
+        reprojectedPoints, _ = cv2.projectPoints(newObjectPoints.astype(np.float32), rotationVecs[imageNumber], translationVecs[imageNumber], cameraMatrix, distCoeffs)
+        reprojectedPoints = reprojectedPoints.reshape(-1,2)
+        reprojectionError.append(computeMeanReprojectionError(cornersRefined, reprojectedPoints))
+
+        image = cv2.drawChessboardCorners(image, PATTERN_SIZE, reprojectedPoints, foundCorners)
+        cv2.imwrite("editedOpenCV_" + fileName, image)
+
+    print("\nControl image affine reprojection error:\n", reprojectionError)
 
 
 
@@ -325,7 +390,8 @@ def main():
     print("Time needed by Affine: ", timeAffine)
 
     if CONTROLLING:
-        movingAffine(X, affineCameraMatrizes, foundCorners, images, t)
+        movingAffine(X, affineCameraMatrizes, images, t)
+        movingCV(objectPoints[0], images, t, rotationVecs, translationVecs, cameraMatrix, distCoeffs)
 
 if __name__ == "__main__":
     main()
