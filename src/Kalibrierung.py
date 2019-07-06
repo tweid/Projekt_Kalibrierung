@@ -8,12 +8,13 @@ import glob
 
 PATTERN_SIZE = (9, 6)
 
+CONTROLLING = True #Is a Controlling-Pattern there
 HORIZONTAL_PATTERN_DISTANCE = 1 #Horizontal distance between Pattern sheets in meter (<0: control pattern left, >0: right)
 VERTICAL_PATTERN_DISTANCE = 0.05 #Vertical distance between Pattern sheets in meter (<0: control pattern up, >0: down)
 
 POINT_DISTANCE = 0.02 #Distance between points in meter
 
-CONTROLLING = True #Is a Controlling-Pattern there
+CRITERIA = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
 CALC_FILE_BEGINNING = 'calc'
 CONTROL_FILE_BEGINNING = 'control'
@@ -200,13 +201,23 @@ def movingAffine(X, affineCameraMatrizes, foundCorners, images, t):
 
     newX = np.add(newX, np.reshape(relative3dDistance, (3, 1)))
 
+    reprojectionError = []
     for imageNumber in range(len(images)):
         fileName = images[imageNumber].replace(CALC_FILE_BEGINNING, CONTROL_FILE_BEGINNING)
         newImagePoints = calculate3dTo2d(affineCameraMatrizes[imageNumber], t[imageNumber], newX)
         newImagePoints = np.reshape(newImagePoints, (PATTERN_SIZE[0] * PATTERN_SIZE[1], 1, 2))
-        newImage = cv2.imread(fileName)
-        newImage = cv2.drawChessboardCorners(newImage, PATTERN_SIZE, newImagePoints.astype(np.float32), foundCorners)
-        cv2.imwrite("edited_" + fileName, newImage)
+        image = cv2.imread(fileName)
+
+        grayImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        foundCorners, corners = cv2.findChessboardCorners(grayImage, PATTERN_SIZE, None)
+        cornersRefined = cv2.cornerSubPix(grayImage, corners, (11, 11), (-1, -1), CRITERIA)
+        reprojectionError.append(computeMeanReprojectionError(cornersRefined, np.reshape(newImagePoints, (PATTERN_SIZE[0]*PATTERN_SIZE[1], 2))))
+
+        image = cv2.drawChessboardCorners(image, PATTERN_SIZE, newImagePoints.astype(np.float32), foundCorners)
+        cv2.imwrite("edited_" + fileName, image)
+
+    print("\n\nControl image reprojection error:\n", reprojectionError)
+
 
 
 
@@ -233,8 +244,6 @@ def movingAffine(X, affineCameraMatrizes, foundCorners, images, t):
 
 
 def main():
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-
     # prepare object points array for size
     # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
     objPoints = np.zeros((PATTERN_SIZE[0]*PATTERN_SIZE[1],3), np.float32)
@@ -254,7 +263,7 @@ def main():
 
         if foundCorners == True:
             print("Found Corners!")
-            cornersRefined = cv2.cornerSubPix(grayImage, corners, (11, 11), (-1, -1), criteria)
+            cornersRefined = cv2.cornerSubPix(grayImage, corners, (11, 11), (-1, -1), CRITERIA)
             image = cv2.drawChessboardCorners(image, PATTERN_SIZE, cornersRefined, foundCorners)
             cv2.imwrite("edited_" + fileName, image)
 
