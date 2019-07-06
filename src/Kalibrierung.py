@@ -6,6 +6,10 @@ from scipy.sparse.linalg import svds, eigs
 from scipy.spatial import distance
 import glob
 
+CALC_FILE_BEGINNING = 'calc'
+CONTROL_FILE_BEGINNING = 'control'
+JPG_NAME = CALC_FILE_BEGINNING + '*.jpg'
+
 
 def affineReconstruction(corners, patternSize):
     # i = 1, ..., m --> Count of camera matrices and therefore images
@@ -177,12 +181,14 @@ def movingHorizontalAffine(X, affineCameraMatrizes, foundCorners, images, patter
                 patternSize[1] * (patternSize[0] - 1))  # Get mean Distance by dividing by number of added Distances
         relative3dDistance[d] = relative3dDistance[d] * relativeDistance * -1  # Multiplying with relative Distance
     newX = np.add(newX, np.reshape(relative3dDistance, (3, 1)))
-    imageNumber = 3
-    newImagePoints = calculate3dTo2d(affineCameraMatrizes[imageNumber], t[imageNumber], newX)
-    newImagePoints = np.reshape(newImagePoints, (patternSize[0] * patternSize[1], 1, 2))
-    newImage = cv2.imread(images[imageNumber])
-    newImage = cv2.drawChessboardCorners(newImage, patternSize, newImagePoints.astype(np.float32), foundCorners)
-    cv2.imwrite("test_" + images[imageNumber], newImage)
+
+    for imageNumber in range(len(images)):
+        fileName = images[imageNumber].replace(CALC_FILE_BEGINNING, CONTROL_FILE_BEGINNING)
+        newImagePoints = calculate3dTo2d(affineCameraMatrizes[imageNumber], t[imageNumber], newX)
+        newImagePoints = np.reshape(newImagePoints, (patternSize[0] * patternSize[1], 1, 2))
+        newImage = cv2.imread(fileName)
+        newImage = cv2.drawChessboardCorners(newImage, patternSize, newImagePoints.astype(np.float32), foundCorners)
+        cv2.imwrite("edited_" + fileName, newImage)
 
 
 
@@ -221,7 +227,7 @@ def main():
     objectPoints = [] # 3d point in real world space
     imagePoints = [] # 2d points in image plane.
 
-    images = glob.glob('calc*.jpg')
+    images = glob.glob(JPG_NAME)
 
     for fileName in images:
         print("Processing ", fileName)
