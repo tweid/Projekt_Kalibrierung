@@ -6,8 +6,10 @@ from scipy.sparse.linalg import svds, eigs
 from scipy.spatial import distance
 import glob
 
-HORIZONTAL_PATTERN_DISTANCE = -1 #Horizontal distance between Pattern sheets in meter
-VERTICAL_PATTERN_DISTANCE = 0.02 #Vertical distance between Pattern sheets in meter
+PATTERN_SIZE = (9, 6)
+
+HORIZONTAL_PATTERN_DISTANCE = 1 #Horizontal distance between Pattern sheets in meter (<0: control pattern left, >0: right)
+VERTICAL_PATTERN_DISTANCE = 0.05 #Vertical distance between Pattern sheets in meter (<0: control pattern up, >0: down)
 
 POINT_DISTANCE = 0.02 #Distance between points in meter
 
@@ -168,7 +170,7 @@ def computeMeanReprojectionError(imgPoints, reprojectedPoints):
 
 
 
-def movingHorizontalAffine(X, affineCameraMatrizes, foundCorners, images, patternSize, t):
+def movingAffine(X, affineCameraMatrizes, foundCorners, images, t):
     # 3d-Points like y, x, z.
     # y-difference = 0.001 und alle 9 0.8
     # x-difference = 0.5
@@ -178,20 +180,32 @@ def movingHorizontalAffine(X, affineCameraMatrizes, foundCorners, images, patter
     relative3dDistance = [0, 0, 0]
 
     #Horizontal Distance
-    for i in range(patternSize[1]):  # For each row
-        for j in range(patternSize[0] - 1):  # For each Distance between two Columns
-            relative3dDistance[1] += X[1][i * patternSize[0] + j + 1] - X[1][
-                i * patternSize[0] + j]  # Sum up Distance between Points
-    relative3dDistance[1] = relative3dDistance[1] / (patternSize[1] * (patternSize[0] - 1))  # Get mean Distance by dividing by number of added Distances
-    relative3dDistance[1] = relative3dDistance[1] * relativeDistance[1]  # Multiplying with relative Distance
+    for i in range(PATTERN_SIZE[1]):  # For each row
+        # Sum up Distance between Points
+        relative3dDistance[1] += X[1][i * PATTERN_SIZE[0]] - X[1][(i + 1) * PATTERN_SIZE[0] - 1]
+    # Get mean Distance by dividing by number of added Distances
+    relative3dDistance[1] = relative3dDistance[1] / (PATTERN_SIZE[1] * (PATTERN_SIZE[0] - 1))
+    # Multiplying with relative Distance
+    relative3dDistance[1] = relative3dDistance[1] * relativeDistance[1]
+
+    #Vertical Distance
+    for i in range(PATTERN_SIZE[0]): #For each column
+        #Sum of vertical distances
+        relative3dDistance[0] += X[0][i] - X[0][i + PATTERN_SIZE[0] * (PATTERN_SIZE[1] - 1)]
+    # Get mean Distance by dividing by number of added Distances
+    relative3dDistance[0] = relative3dDistance[0] / ((PATTERN_SIZE[0] - 1) * PATTERN_SIZE[1])
+    # Multiplying with relative Distance
+    relative3dDistance[0] = relative3dDistance[0] * relativeDistance[0]
+
+
     newX = np.add(newX, np.reshape(relative3dDistance, (3, 1)))
 
     for imageNumber in range(len(images)):
         fileName = images[imageNumber].replace(CALC_FILE_BEGINNING, CONTROL_FILE_BEGINNING)
         newImagePoints = calculate3dTo2d(affineCameraMatrizes[imageNumber], t[imageNumber], newX)
-        newImagePoints = np.reshape(newImagePoints, (patternSize[0] * patternSize[1], 1, 2))
+        newImagePoints = np.reshape(newImagePoints, (PATTERN_SIZE[0] * PATTERN_SIZE[1], 1, 2))
         newImage = cv2.imread(fileName)
-        newImage = cv2.drawChessboardCorners(newImage, patternSize, newImagePoints.astype(np.float32), foundCorners)
+        newImage = cv2.drawChessboardCorners(newImage, PATTERN_SIZE, newImagePoints.astype(np.float32), foundCorners)
         cv2.imwrite("edited_" + fileName, newImage)
 
 
@@ -219,13 +233,12 @@ def movingHorizontalAffine(X, affineCameraMatrizes, foundCorners, images, patter
 
 
 def main():
-    patternSize = (9, 6)
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
     # prepare object points array for size
     # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
-    objPoints = np.zeros((patternSize[0]*patternSize[1],3), np.float32)
-    objPoints[:,:2] = np.mgrid[0:patternSize[0],0:patternSize[1]].T.reshape(-1,2)
+    objPoints = np.zeros((PATTERN_SIZE[0]*PATTERN_SIZE[1],3), np.float32)
+    objPoints[:,:2] = np.mgrid[0:PATTERN_SIZE[0],0:PATTERN_SIZE[1]].T.reshape(-1,2)
 
     # Arrays to store object points and image points from all the images.
     objectPoints = [] # 3d point in real world space
@@ -237,12 +250,12 @@ def main():
         print("Processing ", fileName)
         image = cv2.imread(fileName)
         grayImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        foundCorners, corners = cv2.findChessboardCorners(grayImage, patternSize, None)
+        foundCorners, corners = cv2.findChessboardCorners(grayImage, PATTERN_SIZE, None)
 
         if foundCorners == True:
             print("Found Corners!")
             cornersRefined = cv2.cornerSubPix(grayImage, corners, (11, 11), (-1, -1), criteria)
-            image = cv2.drawChessboardCorners(image, patternSize, cornersRefined, foundCorners)
+            image = cv2.drawChessboardCorners(image, PATTERN_SIZE, cornersRefined, foundCorners)
             cv2.imwrite("edited_" + fileName, image)
 
             objectPoints.append(objPoints)
@@ -282,7 +295,7 @@ def main():
     # Affine reconstruction - factorization alorithm
     print("\n\n\nAffine Reconstruction")
     startAffine = time.time()
-    M, t, X = affineReconstruction(imagePoints, patternSize)
+    M, t, X = affineReconstruction(imagePoints, PATTERN_SIZE)
     endAffine = time.time()
     timeAffine = endAffine - startAffine
     affineCameraMatrizes = np.split(M, len(images))
@@ -303,7 +316,7 @@ def main():
     print("Time needed by Affine: ", timeAffine)
 
     if CONTROLLING:
-        movingHorizontalAffine(X, affineCameraMatrizes, foundCorners, images, patternSize, t)
+        movingAffine(X, affineCameraMatrizes, foundCorners, images, t)
 
 if __name__ == "__main__":
     main()
