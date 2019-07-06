@@ -229,7 +229,34 @@ def main():
     print("\n\nTime needed by OpenCV: ", timeOpenCV)
     print("Time needed by Affine: ", timeAffine)
 
-    #todo: Check with second images
+
+    #3d-Points like y, x, z.
+    #y-difference = 0.001 und alle 9 0.8
+    #x-difference = 0.5
+    #z-difference = random
+    cornerDistance = 0.02 #Horizontal distance between points in meter
+    patternDistance = 1 #Horizontal distance between Pattern sheets in meter
+    relativeDistance = patternDistance / cornerDistance #Ratio between Distance of Patterns and Distance of Points
+    newX = X.copy()
+    relative3dDistance = [0, 0, 0]
+    #for d in range(len(relative3dDistance)): #For every dimension
+    for d in range(1, 2): #For horizontal dimension
+        for i in range(patternSize[1]): #For each row
+            for j in range(patternSize[0] - 1): #For each Distance between two Columns
+                relative3dDistance[d] += X[d][i*patternSize[0] + j + 1] - X[1][i*patternSize[0] + j] #Sum up Distance between Points
+        relative3dDistance[d] = relative3dDistance[d] / (patternSize[1] * (patternSize[0] - 1)) #Get mean Distance by dividing by number of added Distances
+        relative3dDistance[d] = relative3dDistance[d] * relativeDistance * -1 #Multiplying with relative Distance
+
+    newX = np.add(newX, np.reshape(relative3dDistance, (3, 1)))
+
+    imageNumber = 3
+    newImagePoints = calculate3dTo2d(affineCameraMatrizes[imageNumber], t[imageNumber], newX)
+    newImagePoints = np.reshape(newImagePoints, (patternSize[0] * patternSize[1], 1, 2))
+    newImage = cv2.imread(images[imageNumber])
+    newImage = cv2.drawChessboardCorners(newImage, patternSize, newImagePoints.astype(np.float32), foundCorners)
+    cv2.imwrite("test_" + images[imageNumber], newImage)
+
+
 
 
 
