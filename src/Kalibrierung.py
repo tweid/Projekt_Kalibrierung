@@ -10,7 +10,7 @@ PATTERN_SIZE = (9, 6)
 
 CONTROLLING = True #Is a Controlling-Pattern there
 HORIZONTAL_PATTERN_DISTANCE = 1 #Horizontal distance between Pattern sheets in meter (<0: control pattern left, >0: right)
-VERTICAL_PATTERN_DISTANCE = 0.04 #Vertical distance between Pattern sheets in meter (<0: control pattern up, >0: down)
+VERTICAL_PATTERN_DISTANCE = 0.00 #Vertical distance between Pattern sheets in meter (<0: control pattern up, >0: down)
 
 POINT_DISTANCE = 0.02 #Distance between points in meter
 
@@ -281,7 +281,7 @@ def movingCV(objectPoints, images, t, rotationVecs, translationVecs, cameraMatri
         image = cv2.drawChessboardCorners(image, PATTERN_SIZE, reprojectedPoints, foundCorners)
         cv2.imwrite("editedOpenCV_" + fileName, image)
 
-    print("\nControl image affine reprojection error:\n", reprojectionError)
+    print("\nControl image OpenCV reprojection error:\n", reprojectionError)
 
 
 
@@ -385,6 +385,7 @@ def main():
 
     affineReprojectedPoints, affineReprojectionError = affineReprojection(affineCameraMatrizes, imagePoints, t, X)
     print("\n\n\nAffine Reprojected Points;\n", affineReprojectedPoints)
+    print("\nOpenCV Reprojection Errors:\n", meanReprojectionErrors)
     print("\n\nAffine Reprojection Error:\n", affineReprojectionError)
     print("\n\nTime needed by OpenCV: ", timeOpenCV)
     print("Time needed by Affine: ", timeAffine)
