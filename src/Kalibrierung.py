@@ -2,8 +2,7 @@ import time
 
 import numpy as np
 import cv2
-from scipy.sparse.linalg import svds, eigs
-from scipy.spatial import distance
+from scipy.sparse.linalg import svds
 import glob
 
 PATTERN_SIZE = (9, 6)
@@ -66,7 +65,7 @@ def affineReconstruction(corners, patternSize):
 
     M1 = np.matmul(u, d)
     M2 = u
-    #X = np.matrix.getH(vT)
+
     X1 = vT
     X2 = np.matmul(d, vT)
     #seems like (y, x, z)
