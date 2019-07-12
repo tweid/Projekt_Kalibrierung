@@ -64,12 +64,14 @@ def affineReconstruction(corners, patternSize):
     u, dTemp, vT = svds(measurementMatrix, k=3)
     d = np.diag(dTemp)
 
-    M = np.matmul(u, d)
+    M1 = np.matmul(u, d)
+    M2 = u
     #X = np.matrix.getH(vT)
-    X = vT
+    X1 = vT
+    X2 = np.matmul(d, vT)
     #seems like (y, x, z)
 
-    return M, centroid, X
+    return M1, X1, centroid, M2, X2
 
 
 
@@ -171,31 +173,35 @@ def computeMeanReprojectionError(imgPoints, reprojectedPoints):
 
 
 
-def movingAffine(X, affineCameraMatrizes, images, t):
+def movingAffine(X, affineCameraMatrizes, images, t, addition):
     # 3d-Points like y, x, z.
     relativeDistance = [VERTICAL_PATTERN_DISTANCE / POINT_DISTANCE, HORIZONTAL_PATTERN_DISTANCE / POINT_DISTANCE]  # Ratio between Distance of Patterns and Distance of Points
     newX = X.copy()
     relative3dDistance = [0, 0, 0]
+    relativeHorizontal3dDistance = [0, 0, 0]
+    relativeVertical3dDistance = [0, 0, 0]
 
     #Horizontal Distance
-    for i in range(PATTERN_SIZE[1]):  # For each row
-        # Sum up Distance between Points
-        relative3dDistance[1] += X[1][i * PATTERN_SIZE[0]] - X[1][(i + 1) * PATTERN_SIZE[0] - 1]
-    # Get mean Distance by dividing by number of added Distances
-    relative3dDistance[1] = relative3dDistance[1] / (PATTERN_SIZE[1] * (PATTERN_SIZE[0] - 1))
-    # Multiplying with relative Distance
-    relative3dDistance[1] = relative3dDistance[1] * relativeDistance[1]
+    for j in range(len(relative3dDistance)):
+        for i in range(PATTERN_SIZE[1]):  # For each row
+            # Sum up Distance between Points
+            relativeHorizontal3dDistance[j] += X[j][i * PATTERN_SIZE[0]] - X[j][(i + 1) * PATTERN_SIZE[0] - 1]
+        # Get mean Distance by dividing by number of added Distances
+        relativeHorizontal3dDistance[j] = relativeHorizontal3dDistance[j] / (PATTERN_SIZE[1] * (PATTERN_SIZE[0] - 1))
+        # Multiplying with relative Distance
+        relativeHorizontal3dDistance[j] = relativeHorizontal3dDistance[j] * relativeDistance[1]
 
     #Vertical Distance
-    for i in range(PATTERN_SIZE[0]): #For each column
-        #Sum of vertical distances
-        relative3dDistance[0] += X[0][i] - X[0][i + PATTERN_SIZE[0] * (PATTERN_SIZE[1] - 1)]
-    # Get mean Distance by dividing by number of added Distances
-    relative3dDistance[0] = relative3dDistance[0] / ((PATTERN_SIZE[0] - 1) * PATTERN_SIZE[1])
-    # Multiplying with relative Distance
-    relative3dDistance[0] = relative3dDistance[0] * relativeDistance[0]
+    for j in range(len(relative3dDistance)):
+        for i in range(PATTERN_SIZE[0]): #For each column
+            #Sum of vertical distances
+            relativeVertical3dDistance[j] += X[j][i] - X[j][i + PATTERN_SIZE[0] * (PATTERN_SIZE[1] - 1)]
+        # Get mean Distance by dividing by number of added Distances
+        relativeVertical3dDistance[j] = relativeVertical3dDistance[j] / ((PATTERN_SIZE[0] - 1) * PATTERN_SIZE[1])
+        # Multiplying with relative Distance
+        relativeVertical3dDistance[j] = relativeVertical3dDistance[j] * relativeDistance[0]
 
-
+    relative3dDistance = np.add(relativeVertical3dDistance, relativeHorizontal3dDistance)
     newX = np.add(newX, np.reshape(relative3dDistance, (3, 1)))
 
     reprojectionError = []
@@ -211,9 +217,10 @@ def movingAffine(X, affineCameraMatrizes, images, t):
         reprojectionError.append(computeMeanReprojectionError(cornersRefined, np.reshape(newImagePoints, (PATTERN_SIZE[0]*PATTERN_SIZE[1], 2))))
 
         image = cv2.drawChessboardCorners(image, PATTERN_SIZE, newImagePoints.astype(np.float32), foundCorners)
-        cv2.imwrite("edited_" + fileName, image)
+        cv2.imwrite("edited" + addition + "_" + fileName, image)
 
-    print("\n\nControl image affine reprojection error:\n", reprojectionError)
+    print("\n\nControl image affine reprojection error" + addition + ":\n", reprojectionError)
+    print("Mean: ", np.mean(reprojectionError))
 
 
 
@@ -282,6 +289,7 @@ def movingCV(objectPoints, images, t, rotationVecs, translationVecs, cameraMatri
         cv2.imwrite("editedOpenCV_" + fileName, image)
 
     print("\nControl image OpenCV reprojection error:\n", reprojectionError)
+    print("Mean: ", np.mean(reprojectionError))
 
 
 
@@ -369,29 +377,44 @@ def main():
     # Affine reconstruction - factorization alorithm
     print("\n\n\nAffine Reconstruction")
     startAffine = time.time()
-    M, t, X = affineReconstruction(imagePoints, PATTERN_SIZE)
+    M1, X1, t, M2, X2 = affineReconstruction(imagePoints, PATTERN_SIZE)
     endAffine = time.time()
     timeAffine = endAffine - startAffine
-    affineCameraMatrizes = np.split(M, len(images))
+    affineCameraMatrizesV1 = np.split(M1, len(images))
+    affineCameraMatrizesV2 = np.split(M2, len(images))
 
 
-    print("\n\nAffine CameraMatrizes:")
-    print(M)
-    print("\n\nAffine CameraMatrizes:")
-    print(affineCameraMatrizes)
-    print("\n3D-Points:")
-    print(X)
+    print("\n\nAffine CameraMatrizes V1:")
+    print(M1)
+    print("\n\nAffine CameraMatrizes V1:")
+    print(affineCameraMatrizesV1)
+    print("\n3D-Points V1:")
+    print(X1)
+
+    print("\n\nAffine CameraMatrizes V2:")
+    print(M2)
+    print("\n\nAffine CameraMatrizes V2:")
+    print(affineCameraMatrizesV2)
+    print("\n3D-Points V2:")
+    print(X2)
     print("\nt:\n", t)
 
-    affineReprojectedPoints, affineReprojectionError = affineReprojection(affineCameraMatrizes, imagePoints, t, X)
-    print("\n\n\nAffine Reprojected Points;\n", affineReprojectedPoints)
+    affineReprojectedPoints1, affineReprojectionError1 = affineReprojection(affineCameraMatrizesV1, imagePoints, t, X1)
+    affineReprojectedPoints2, affineReprojectionError2 = affineReprojection(affineCameraMatrizesV2, imagePoints, t, X2)
+    print("\n\n\nAffine Reprojected Points1;\n", affineReprojectedPoints1)
+    print("\n\n\nAffine Reprojected Points2;\n", affineReprojectedPoints2)
     print("\nOpenCV Reprojection Errors:\n", meanReprojectionErrors)
-    print("\n\nAffine Reprojection Error:\n", affineReprojectionError)
+    print("Mean: ", np.mean(meanReprojectionErrors))
+    print("\n\nAffine Reprojection Error1:\n", affineReprojectionError1)
+    print("Mean: ", np.mean(affineReprojectionError1))
+    print("\n\nAffine Reprojection Error2:\n", affineReprojectionError2)
+    print("Mean: ", np.mean(affineReprojectionError2))
     print("\n\nTime needed by OpenCV: ", timeOpenCV)
     print("Time needed by Affine: ", timeAffine)
 
     if CONTROLLING:
-        movingAffine(X, affineCameraMatrizes, images, t)
+        movingAffine(X1, affineCameraMatrizesV1, images, t, "")
+        movingAffine(X2, affineCameraMatrizesV2, images, t, "2")
         movingCV(objectPoints[0], images, t, rotationVecs, translationVecs, cameraMatrix, distCoeffs)
 
 if __name__ == "__main__":
