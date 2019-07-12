@@ -213,6 +213,8 @@ def movingAffine(X, affineCameraMatrizes, images, t, addition):
 
         grayImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         foundCorners, corners = cv2.findChessboardCorners(grayImage, PATTERN_SIZE, None)
+        if foundCorners == False:
+            raise Exception("Didn't found corners in ", fileName)
         cornersRefined = cv2.cornerSubPix(grayImage, corners, (11, 11), (-1, -1), CRITERIA)
         reprojectionError.append(computeMeanReprojectionError(cornersRefined, np.reshape(newImagePoints, (PATTERN_SIZE[0]*PATTERN_SIZE[1], 2))))
 
@@ -279,6 +281,8 @@ def movingCV(objectPoints, images, t, rotationVecs, translationVecs, cameraMatri
 
         grayImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         foundCorners, corners = cv2.findChessboardCorners(grayImage, PATTERN_SIZE, None)
+        if foundCorners == False:
+            raise Exception("Didn't found corners in ", fileName)
         cornersRefined = cv2.cornerSubPix(grayImage, corners, (11, 11), (-1, -1), CRITERIA)
 
         reprojectedPoints, _ = cv2.projectPoints(newObjectPoints.astype(np.float32), rotationVecs[imageNumber], translationVecs[imageNumber], cameraMatrix, distCoeffs)
@@ -346,7 +350,7 @@ def main():
 
 
         else:
-            print("Didn't found corners in ", fileName)
+            raise Exception("Didn't found corners in ", fileName)
 
     startOpenCV = time.time()
     reprojectionError, cameraMatrix, distCoeffs, rotationVecs, translationVecs = cv2.calibrateCamera(objectPoints, imagePoints, grayImage.shape[::-1],None,None)
